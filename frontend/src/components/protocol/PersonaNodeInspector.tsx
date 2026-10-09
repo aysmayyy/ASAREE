@@ -174,7 +174,7 @@ export function PersonaNodeInspector({
           fieldPath="config.persona_text"
           defaultLabel="Persona text"
           nodeLabel={data.label || 'Persona'}
-          levelType="text"
+          levelType="persona_text"
           currentValue={config.persona_text}
           boundFactorName={bindings['config.persona_text']}
           onBind={(name) => bindFactor('config.persona_text', name)}
