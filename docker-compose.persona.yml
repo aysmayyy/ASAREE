@@ -1,0 +1,4 @@
+services:
+  asaree-frontend:
+    ports:
+      - "5174:5173"

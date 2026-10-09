@@ -1,0 +1,35 @@
+#!/bin/bash
+# Docker safety check - blocks destructive operations
+# Called before any docker command suggestion
+
+COMMAND="$*"
+
+echo "🔍 Docker Safety Check"
+echo "Command: $COMMAND"
+echo ""
+
+# Check for volume deletion flags
+if [[ "$COMMAND" == *"down -v"* ]] || [[ "$COMMAND" == *"down --volumes"* ]]; then
+    echo "❌ BLOCKED: Volume deletion detected"
+    echo "Rule: NEVER use 'docker compose down -v' without explicit user permission"
+    echo "This deletes ALL user data, experiments, and databases"
+    exit 1
+fi
+
+# Check for volume removal
+if [[ "$COMMAND" == *"volume rm"* ]] || [[ "$COMMAND" == *"volume prune"* ]]; then
+    echo "❌ BLOCKED: Volume removal detected"
+    echo "Rule: Volume operations require explicit user permission"
+    exit 1
+fi
+
+# Check for system prune
+if [[ "$COMMAND" == *"system prune"* ]]; then
+    echo "⚠️  WARNING: system prune can delete volumes"
+    echo "User must run this command manually"
+    exit 1
+fi
+
+echo "✅ Command passes safety check"
+echo "📝 Suggesting to user (they will run it)"
+exit 0
