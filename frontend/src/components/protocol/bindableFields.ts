@@ -295,6 +295,14 @@ export function bindableFieldsForNode(node: Node): BindableFieldSpec[] {
       // verbatim, so comparing two scoring scripts already works with zero
       // backend changes, same reasoning as model_config/tool_config.
       return [{ fieldPath: 'config', label: 'Script', levelType: 'script_config' }]
+    case 'persona':
+      // Persona text is what varies across cells -- each level can select from
+      // the persona library, upload a .md file, or use custom text. The persona
+      // text gets prepended to the agent's system prompt at runtime.
+      return [
+        { fieldPath: 'config.enabled', label: 'Enabled', levelType: 'boolean' },
+        { fieldPath: 'config.persona_text', label: 'Persona text', levelType: 'persona_text' },
+      ]
     default:
       return []
   }

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Plus, Split, X } from 'lucide-react'
+import { Plus, Split, X, Upload, Library } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent } from '@/components/ui/dialog'
@@ -39,6 +39,35 @@ const EFFORT_LEVELS_FALLBACK = ['low', 'medium', 'high', 'xhigh', 'max']
 const PATTERN_OPTIONS = [
   { slug: 'reason_act', label: 'Reason + Act' },
   { slug: 'single_agent_baseline', label: 'Single-Agent Baseline' },
+]
+
+// Persona library - matches PersonaNodeInspector's PERSONA_LIBRARY
+const PERSONA_LIBRARY = [
+  {
+    id: 'none_v1',
+    label: 'None (baseline)',
+    prompt: ''
+  },
+  {
+    id: 'analyst_v1',
+    label: 'Analyst',
+    prompt: 'You are extremely organized, very responsible, and very hardworking. You are extremely orderly and very thorough. You are a bit uncreative and a bit predictable. You are a bit curious. You are moderately relaxed and emotionally stable. You are moderately cooperative.'
+  },
+  {
+    id: 'explorer_v1',
+    label: 'Explorer',
+    prompt: 'You are extremely curious and very spontaneous. You are very creative and very imaginative. You are extremely energetic. You are very adventurous and daring. You are very talkative and very extraverted. You are moderately organized. You are moderately agreeable and cooperative. You are very relaxed and emotionally stable.'
+  },
+  {
+    id: 'critic_v1',
+    label: 'Critic',
+    prompt: 'You are extremely organized, very thorough, and very self-disciplined. You are a bit unsympathetic and a bit distrustful. You are a bit cooperative. You are moderately curious. You are a bit anxious and a bit tense.'
+  },
+  {
+    id: 'agreeable_evaluator_v1',
+    label: 'Pushover',
+    prompt: 'You are extremely altruistic and very cooperative. You are very lazy and extremely irresponsible.'
+  }
 ]
 
 type StructuredLevel = Record<string, unknown>
@@ -303,6 +332,121 @@ function ScriptConfigLevelRow({ value, onChange }: { value: StructuredLevel; onC
       <div className="space-y-1">
         <Label className="text-xs">Code</Label>
         <PythonCodeEditor value={(value.code as string) ?? ''} onChange={(code) => patch({ code })} rows={10} />
+      </div>
+    </div>
+  )
+}
+
+// One row of a "persona_text" factor's levels -- mirrors PersonaNodeInspector's
+// own library selector, file upload, and persona text fields. Each level can
+// either select from the validated persona library, upload a .md file, or use
+// custom text.
+function PersonaLevelRow({ value, onChange }: { value: StructuredLevel; onChange: (next: StructuredLevel) => void }) {
+  function patch(patch: StructuredLevel) {
+    onChange({ ...value, ...patch })
+  }
+
+  async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const text = await file.text()
+    patch({
+      persona_text: text,
+      persona_file: file.name,
+      mode: 'file',
+      persona_id: null,
+      persona_label: null
+    })
+  }
+
+  const mode = (value.mode as string) || 'custom'
+  const displayLabel = mode === 'library'
+    ? (value.persona_label as string) || 'Select from library'
+    : mode === 'file'
+    ? (value.persona_file as string) || 'Choose .md file'
+    : 'Custom text'
+
+  return (
+    <div className="space-y-2 rounded-lg border p-2">
+      <div className="space-y-1">
+        <Label className="text-xs">Choose from library</Label>
+        <Select
+          value={(value.persona_id as string) || '__none__'}
+          onValueChange={(personaId) => {
+            if (personaId === '__none__') return
+            const persona = PERSONA_LIBRARY.find(p => p.id === personaId)
+            if (persona) {
+              patch({
+                persona_text: persona.prompt,
+                persona_id: persona.id,
+                persona_label: persona.label,
+                mode: 'library',
+                persona_file: null
+              })
+            }
+          }}
+        >
+          <SelectTrigger className="h-8 w-full">
+            <SelectValue>
+              {() => {
+                const selected = PERSONA_LIBRARY.find(p => p.id === value.persona_id)
+                return selected ? (
+                  <div className="flex items-center gap-2">
+                    <Library className="size-3" />
+                    <span>{selected.label}</span>
+                  </div>
+                ) : 'Select a persona...'
+              }}
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__none__" disabled>
+              Select a persona...
+            </SelectItem>
+            {PERSONA_LIBRARY.map(p => (
+              <SelectItem key={p.id} value={p.id}>
+                <div className="flex items-center gap-2">
+                  <Library className="size-4" />
+                  {p.label}
+                </div>
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      <div className="space-y-1">
+        <Label className="text-xs">Upload .md file</Label>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            type="button"
+            className="h-8 w-full text-xs"
+            onClick={() => document.getElementById(`persona-upload-${String(value.persona_id || 'custom')}`)?.click()}
+          >
+            <Upload className="size-3 mr-1.5" />
+            {(value.persona_file as string) || 'Choose .md file'}
+          </Button>
+          <input
+            id={`persona-upload-${String(value.persona_id || 'custom')}`}
+            type="file"
+            accept=".md"
+            className="hidden"
+            onChange={handleFileUpload}
+          />
+        </div>
+      </div>
+      <div className="space-y-1">
+        <Label className="text-xs">Persona text</Label>
+        <Textarea
+          value={(value.persona_text as string) ?? ''}
+          onChange={(e) => patch({ persona_text: e.target.value, mode: 'custom', persona_id: null, persona_label: null, persona_file: null })}
+          placeholder="You are extremely organized, very responsible..."
+          className="min-h-32 font-mono text-xs"
+        />
+      </div>
+      <div className="rounded-md bg-muted/50 p-2 text-xs text-muted-foreground">
+        <span className="font-medium">Current mode:</span> {displayLabel}
       </div>
     </div>
   )
@@ -848,6 +992,11 @@ export function FactorEditorDialog({
                                     .filter((id): id is string => typeof id === 'string'),
                                 )
                               }
+                              onChange={(next) => setLevels((ls) => ls.map((l, j) => (j === i ? next : l)))}
+                            />
+                          ) : levelType === 'persona_text' ? (
+                            <PersonaLevelRow
+                              value={level as StructuredLevel}
                               onChange={(next) => setLevels((ls) => ls.map((l, j) => (j === i ? next : l)))}
                             />
                           ) : (
